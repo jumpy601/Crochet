@@ -194,6 +194,37 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
 .toggle.on::after { left:22px; }
 .stitch-setting-link { background:none; border:none; color:var(--brown-light); font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; padding:4px 8px; text-decoration:underline; touch-action:manipulation; }
 
+
+/* ── 十字格子進度圖 ── */
+.grid-card { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+.grid-scroll { overflow:auto; max-height:340px; -webkit-overflow-scrolling:touch; }
+.grid-table { border-collapse:collapse; }
+.grid-table th { font-size:10px; color:var(--brown-light); font-weight:600; padding:4px 0; min-width:30px; text-align:center; position:sticky; top:0; background:var(--card); z-index:2; }
+.grid-table td.rowhead { font-size:10px; color:var(--brown-light); font-weight:600; padding:0 6px; text-align:right; position:sticky; left:0; background:var(--card); z-index:1; white-space:nowrap; }
+.grid-cell { width:30px; height:30px; border:1px solid var(--cream); border-radius:6px; cursor:pointer; touch-action:manipulation; background:var(--bg); }
+.grid-cell.done { background:var(--teal-light); border-color:var(--teal); }
+.grid-cell.cur { background:var(--clay); border-color:var(--clay); box-shadow:0 0 0 2px var(--clay-light); }
+.grid-cell.crossrow { background:#F5E3DC; }
+.grid-cell.crosscol { background:#F5E3DC; }
+.grid-cell.done.crossrow, .grid-cell.done.crosscol { background:var(--teal-light); }
+
+
+/* ── 格子進度圖 ── */
+.grid-wrap { padding: 8px 12px 16px; overflow-x: auto; }
+.grid-table { border-collapse: separate; border-spacing: 4px; }
+.grid-corner { width: 44px; min-width: 44px; }
+.grid-col-head { font-size: 10px; color: var(--brown-light); font-weight: 600; text-align: center; padding-bottom: 2px; white-space: nowrap; }
+.grid-row-head { font-size: 11px; color: var(--brown-light); font-weight: 600; text-align: right; padding-right: 6px; white-space: nowrap; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.grid-row-head.current { color: var(--clay); font-weight: 700; }
+.grid-cell { width: 34px; height: 34px; min-width: 34px; border-radius: 8px; background: var(--card); border: 1.5px solid var(--cream); cursor: pointer; touch-action: manipulation; text-align: center; vertical-align: middle; font-size: 15px; color: white; transition: all 0.1s; user-select: none; -webkit-user-select: none; }
+.grid-cell.checked { background: var(--teal); border-color: var(--teal); }
+.grid-cell.current-row { border-color: var(--clay); }
+.grid-cell:active { transform: scale(0.9); }
+.grid-cfg-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 0; font-size: 13px; color: var(--brown-light); flex-wrap: wrap; }
+.view-toggle { display: flex; gap: 0; border: 1.5px solid var(--cream); border-radius: 99px; overflow: hidden; }
+.view-toggle button { padding: 7px 14px; border: none; background: var(--card); font-size: 12px; font-weight: 600; color: var(--brown-light); cursor: pointer; font-family: 'Inter', sans-serif; touch-action: manipulation; }
+.view-toggle button.active { background: var(--clay); color: white; }
+
 .notes-textarea { width: 100%; min-height: 200px; padding: 16px; border-radius: var(--radius); border: 1.5px solid var(--cream); background: var(--card); font-size: 15px; font-family: 'Inter', sans-serif; color: var(--brown); resize: none; outline: none; box-shadow: var(--shadow); line-height: 1.6; }
 .install-banner { background: var(--brown); color: var(--bg); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; border-radius: var(--radius); }
 .install-banner-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
@@ -325,6 +356,8 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
     </div>
     <div class="field-label">總行數 / 圈數</div>
     <input class="field-input" id="newTotal" placeholder="例：40" type="number" inputmode="numeric">
+    <div class="field-label">每行花樣數（選填，填了會顯示格子進度圖）</div>
+    <input class="field-input" id="newPatternPerRow" placeholder="例：6" type="number" inputmode="numeric">
     <div class="field-label" style="margin-top:4px">計數器模組</div>
     <div class="module-list">
       <div class="module-check checked disabled">
@@ -445,6 +478,8 @@ function load() {
       if (s.stitch === undefined) s.stitch = 0;
       if (s.repeat === undefined) s.repeat = 0;
       if (!s.stitchSeq) s.stitchSeq = [];
+      if (!s.gridChecks) s.gridChecks = {};
+      if (!s.gridCols) s.gridCols = 3;
       // normalize charts
       for (var m = 0; m < s.charts.length; m++) {
         var chd = s.charts[m];
@@ -614,6 +649,96 @@ function getStitchSegment(s, row) {
     }
   }
   return null;
+}
+
+
+// ── 格子進度圖 ──
+var chartViewMode = 'photo'; // 'photo' | 'grid'
+
+function setChartView(mode) {
+  chartViewMode = mode;
+  chartImgSrcId = null; // force re-render
+  renderChart();
+}
+
+function getGridChecks(s) {
+  if (!s.gridChecks) s.gridChecks = {};
+  if (!s.gridCols) s.gridCols = 3;
+  return s.gridChecks;
+}
+
+function toggleGridCell(r, col) {
+  var p = getProject(); if (!p) return;
+  var checks = getGridChecks(p);
+  var key = r + '_' + col;
+  if (checks[key]) delete checks[key];
+  else checks[key] = true;
+  save();
+  var cell = document.getElementById('gc_' + r + '_' + col);
+  if (cell) {
+    var on = !!checks[key];
+    cell.classList.toggle('checked', on);
+    cell.textContent = on ? '✓' : '';
+  }
+}
+
+function toggleGridRow(r) {
+  var p = getProject(); if (!p) return;
+  var checks = getGridChecks(p);
+  // if all checked → clear; else fill
+  var allOn = true;
+  for (var col = 1; col <= p.gridCols; col++) {
+    if (!checks[r + '_' + col]) { allOn = false; break; }
+  }
+  for (var col2 = 1; col2 <= p.gridCols; col2++) {
+    var key = r + '_' + col2;
+    if (allOn) delete checks[key];
+    else checks[key] = true;
+  }
+  save();
+  renderGridView();
+}
+
+function adjGridCols(d) {
+  var p = getProject(); if (!p) return;
+  getGridChecks(p);
+  p.gridCols = Math.max(1, Math.min(20, p.gridCols + d));
+  save();
+  renderGridView();
+}
+
+function renderGridView() {
+  var p = getProject(); if (!p) return;
+  var el = document.getElementById('gridArea'); if (!el) return;
+  var checks = getGridChecks(p);
+  var cols = p.gridCols;
+  var unit = p.type === 'round' ? '圈' : '行';
+
+  var html = '<div class="grid-cfg-bar">花樣數/列：';
+  html += '<button class="range-btn" onclick="adjGridCols(-1)">−</button>';
+  html += '<span class="range-val">' + cols + '</span>';
+  html += '<button class="range-btn" onclick="adjGridCols(1)">＋</button>';
+  html += '<span style="margin-left:auto;font-size:11px">點格子打勾 · 點行號整行勾</span>';
+  html += '</div>';
+
+  html += '<div class="grid-wrap"><table class="grid-table"><tr><td class="grid-corner"></td>';
+  for (var col = 1; col <= cols; col++) {
+    html += '<td class="grid-col-head">花' + col + '</td>';
+  }
+  html += '</tr>';
+
+  for (var r = 1; r <= p.total; r++) {
+    var isCurrent = r === p.row;
+    html += '<tr>';
+    html += '<td class="grid-row-head' + (isCurrent ? ' current' : '') + '" onclick="toggleGridRow(' + r + ')">' + (isCurrent ? '▶ ' : '') + unit + r + '</td>';
+    for (var c2 = 1; c2 <= cols; c2++) {
+      var on = !!checks[r + '_' + c2];
+      html += '<td class="grid-cell' + (on ? ' checked' : '') + (isCurrent ? ' current-row' : '') + '" id="gc_' + r + '_' + c2 + '" onclick="toggleGridCell(' + r + ',' + c2 + ')">' + (on ? '✓' : '') + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  el.innerHTML = html;
 }
 
 function toggleComplete() {
@@ -816,7 +941,10 @@ function adjustRow(d) {
     showToast('換「' + stitchName(newSeg.seg.stitch) + '」囉！');
   }
   save(); renderCounter(); renderList();
-  if(currentTab==='chart') { drawChart(); updateChartStatusBar(p); }
+  if(currentTab==='chart') {
+    if (chartViewMode === 'grid') renderGridView();
+    else { drawChart(); updateChartStatusBar(p); }
+  }
 }
 function adjustStitch(d) { var p=getProject(); if(!p) return; p.stitch=Math.max(0,p.stitch+d); save(); renderCounter(); if(currentTab==='chart') { drawChart(); updateChartStatusBar(p); } }
 function resetStitch() { var p=getProject(); if(!p) return; p.stitch=0; save(); renderCounter(); showToast('針數已重置'); if(currentTab==='chart') drawChart(); }
@@ -1146,6 +1274,18 @@ function renderChart() {
   if (!p) { el.innerHTML = '<div class="chart-empty"><p>請先選擇細項</p></div>'; return; }
   if (!p.charts) p.charts = [];
 
+  // ── 格子模式 ──
+  if (chartViewMode === 'grid') {
+    var ghtml = '<div style="padding:12px 16px 0"><div class="view-toggle">';
+    ghtml += '<button onclick="setChartView(\'photo\')">&#x1F4F7; 照片</button>';
+    ghtml += '<button class="active">&#x229E; 格子</button>';
+    ghtml += '</div></div>';
+    ghtml += '<div id="gridArea"></div>';
+    el.innerHTML = ghtml;
+    renderGridView();
+    return;
+  }
+
   var ch = getActiveChart(p);
   var hasImg = !!(ch && ch.imageData);
   var hasAnchors = hasImg && ch.anchors.length >= 2;
@@ -1160,7 +1300,11 @@ function renderChart() {
     return;
   }
 
-  var html = '<div class="chart-toolbar">';
+  var html = '<div style="padding:12px 16px 0"><div class="view-toggle">';
+  html += '<button class="active">&#x1F4F7; 照片</button>';
+  html += '<button onclick="setChartView(\'grid\')">&#x229E; 格子</button>';
+  html += '</div></div>';
+  html += '<div class="chart-toolbar">';
   html += '<button class="chart-tool-btn" onclick="document.getElementById(\'chartFileInput\').click()">&#x1F4F7; ' + (hasImg ? '加新圖' : '上傳 / 拍照') + '</button>';
   if (hasImg) html += '<button class="chart-tool-btn" id="btnAddAnchor" onclick="startAddAnchor()">&#x1F4CC; 加錨點</button>';
   if (hasImg && hasAnchors) html += '<button class="chart-tool-btn" id="btnDrag" onclick="startDragMode()">&#x2195;&#xFE0F; 微調行</button>';
@@ -1639,7 +1783,8 @@ function switchTab(tab) {
       var p3 = getProject();
       var expected = p3 ? (p3.activeChart + '_' + currentSubId) : null;
       var cv = document.getElementById('chartCanvas');
-      if (cv && chartImg && chartImg.complete && chartImg.naturalWidth > 0 && chartImgSrcId === expected) {
+      if (chartViewMode === 'grid') { renderChart(); }
+      else if (cv && chartImg && chartImg.complete && chartImg.naturalWidth > 0 && chartImgSrcId === expected) {
         requestAnimationFrame(function() {
           requestAnimationFrame(function() {
             drawChart();
