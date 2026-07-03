@@ -185,7 +185,7 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
 <body>
 
 <div class="header" id="header">
-  <button class="header-back" id="headerBack" onclick="goHome()">&#8249;</button>
+  <button class="header-back" id="headerBack" onclick="headerBackAction()">&#8249;</button>
   <div style="flex:1">
     <div class="header-title" id="headerTitle">&#x1F9F6; 我的作品</div>
     <div class="header-sub" id="headerSub" style="display:none"></div>
@@ -208,7 +208,16 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
   </div>
   <div class="section-label">進行中的作品</div>
   <div id="projectList"></div>
-  <button class="add-btn" onclick="openAddModal()">＋ 新增作品</button>
+  <button class="add-btn" onclick="openAddProjectModal()">＋ 新增作品</button>
+</div>
+
+<div class="page" id="pageSubs">
+  <div class="section-label">細項（部件）</div>
+  <div id="subList"></div>
+  <button class="add-btn" onclick="openAddSubModal()">＋ 新增細項</button>
+  <div class="delete-area">
+    <button class="delete-project-btn" onclick="confirmDeleteProject()">&#x1F5D1; 刪除整個作品</button>
+  </div>
 </div>
 
 <div class="page" id="pageCounter">
@@ -261,11 +270,23 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
   </button>
 </div>
 
-<div class="modal-overlay" id="addModal">
+<div class="modal-overlay" id="addProjectModal">
   <div class="modal">
     <div class="modal-title">新增作品</div>
     <div class="field-label">作品名稱</div>
-    <input class="field-input" id="newName" placeholder="例：小熊帽子、方形杯墊…" type="text">
+    <input class="field-input" id="newProjName" placeholder="例：玩偶熊熊、嬰兒毯…" type="text">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAddProjectModal()">取消</button>
+      <button class="btn-save" onclick="saveNewProjectV3()">建立</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">新增細項</div>
+    <div class="field-label">作品名稱</div>
+    <input class="field-input" id="newName" placeholder="例：頭部、身體、左手…" type="text">
     <div class="field-label">類型</div>
     <div class="type-toggle">
       <button class="type-btn selected" id="typeFlat" onclick="selectType('flat')">平織（行）<br><span style="font-size:11px;font-weight:400;opacity:0.8">圍巾、毯子、方巾</span></button>
@@ -329,32 +350,83 @@ var chartImg = null;
 var modStitchOn = false;
 var modRepeatOn = false;
 
-function save() { localStorage.setItem('crochet_v2', JSON.stringify(projects)); }
+function save() { localStorage.setItem('crochet_v3', JSON.stringify(projects)); }
+
+function makeSubFromOld(p) {
+  var charts = [];
+  if (p.chart && p.chart.imageData) charts.push(p.chart);
+  return { id: p.id, name: p.name, type: p.type, total: p.total, row: p.row, stitch: p.stitch||0,
+    repeat: p.repeat||0, notes: p.notes||'', modules: p.modules||{stitch:false,repeat:false,custom:[]},
+    charts: charts, activeChart: 0, completed: !!p.completed };
+}
+
 function load() {
-  var raw = localStorage.getItem('crochet_v2');
-  if (!raw) raw = localStorage.getItem('crochet_projects');
-  if (raw) { try { projects = JSON.parse(raw); } catch(e) { projects = []; } }
-  for (var i = 0; i < projects.length; i++) {
-    var p = projects[i];
-    if (!p.modules) p.modules = { stitch: true, repeat: true, custom: [] };
-    if (!p.modules.custom) p.modules.custom = [];
-    if (!p.chart) p.chart = { imageData: null, anchors: [], rowOverrides: {}, stitchX1: null, stitchX2: null };
-    if (!p.chart.anchors) {
-      var ancs = [];
-      if (p.chart.rowY1 !== null && p.chart.rowY1 !== undefined) ancs.push({row:1, y:p.chart.rowY1});
-      if (p.chart.rowY2 !== null && p.chart.rowY2 !== undefined) ancs.push({row:2, y:p.chart.rowY2});
-      p.chart.anchors = ancs;
-      if (!p.chart.rowOverrides) p.chart.rowOverrides = {};
+  var raw = localStorage.getItem('crochet_v3');
+  if (raw) {
+    try { projects = JSON.parse(raw); } catch(e) { projects = []; }
+  } else {
+    // migrate from v2: each old project becomes a project with one sub
+    var v2 = localStorage.getItem('crochet_v2');
+    if (!v2) v2 = localStorage.getItem('crochet_projects');
+    if (v2) {
+      try {
+        var oldList = JSON.parse(v2);
+        projects = [];
+        for (var i = 0; i < oldList.length; i++) {
+          var op = oldList[i];
+          projects.push({ id: 'proj_' + op.id, name: op.name, subs: [makeSubFromOld(op)] });
+        }
+        save();
+      } catch(e) { projects = []; }
     }
-    if (p.stitch === undefined) p.stitch = 0;
-    if (p.repeat === undefined) p.repeat = 0;
+  }
+  // ensure structure
+  for (var j = 0; j < projects.length; j++) {
+    var pj = projects[j];
+    if (!pj.subs) pj.subs = [];
+    for (var k = 0; k < pj.subs.length; k++) {
+      var s = pj.subs[k];
+      if (!s.modules) s.modules = { stitch:false, repeat:false, custom:[] };
+      if (!s.modules.custom) s.modules.custom = [];
+      if (!s.charts) {
+        s.charts = [];
+        if (s.chart && s.chart.imageData) { s.charts.push(s.chart); delete s.chart; }
+      }
+      if (s.activeChart === undefined) s.activeChart = 0;
+      if (s.stitch === undefined) s.stitch = 0;
+      if (s.repeat === undefined) s.repeat = 0;
+      // normalize charts
+      for (var m = 0; m < s.charts.length; m++) {
+        var chd = s.charts[m];
+        if (!chd.anchors) chd.anchors = [];
+        if (!chd.rowOverrides) chd.rowOverrides = {};
+        if (chd.stitchX1 === undefined) chd.stitchX1 = null;
+        if (chd.stitchX2 === undefined) chd.stitchX2 = null;
+        if (chd.done === undefined) chd.done = false;
+      }
+    }
   }
 }
 function genId() { return 'p_' + Date.now() + '_' + Math.floor(Math.random() * 9999); }
-function getProject() {
+
+var currentSubId = null;
+
+function getProj() {
   if (!currentProjectId) return null;
   for (var i = 0; i < projects.length; i++) { if (projects[i].id === currentProjectId) return projects[i]; }
   return null;
+}
+// getProject returns the CURRENT SUB so all counter/chart code keeps working
+function getProject() {
+  var pj = getProj(); if (!pj || !currentSubId) return null;
+  for (var i = 0; i < pj.subs.length; i++) { if (pj.subs[i].id === currentSubId) return pj.subs[i]; }
+  return null;
+}
+// active chart of current sub
+function getActiveChart(s) {
+  if (!s || !s.charts || s.charts.length === 0) return null;
+  if (s.activeChart >= s.charts.length) s.activeChart = 0;
+  return s.charts[s.activeChart];
 }
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -369,74 +441,112 @@ function toggleComplete() {
 
 function renderList() {
   var el = document.getElementById('projectList');
-  var active = projects.filter(function(p) { return !p.completed; });
-  var done = projects.filter(function(p) { return p.completed; });
-
   if (projects.length === 0) {
     el.innerHTML = '<div class="empty-state"><div class="emoji">&#x1F9F6;</div><p>還沒有作品<br>點下方「新增作品」開始記錄！</p></div>';
     return;
   }
-
   var html = '';
-
-  // Active projects
-  if (active.length === 0 && done.length > 0) {
-    html += '<div class="empty-state" style="padding:20px"><p style="font-size:14px">所有作品都完成了！🎉</p></div>';
-  }
-  for (var i = 0; i < active.length; i++) {
-    html += renderProjectCard(active[i]);
-  }
-
-  // Completed section
-  if (done.length > 0) {
-    html += '<div class="section-label" style="margin-top:20px">已完成</div>';
-    for (var j = 0; j < done.length; j++) {
-      html += renderProjectCard(done[j]);
+  for (var i = 0; i < projects.length; i++) {
+    var pj = projects[i];
+    var total = pj.subs.length;
+    var done = 0;
+    var rowSum = 0, totalSum = 0;
+    for (var k = 0; k < total; k++) {
+      if (pj.subs[k].completed) done++;
+      rowSum += Math.min(pj.subs[k].row, pj.subs[k].total);
+      totalSum += pj.subs[k].total;
     }
+    var pct = totalSum > 0 ? Math.min(100, Math.round((rowSum / totalSum) * 100)) : 0;
+    var allDone = total > 0 && done === total;
+    var badge = allDone ? '<span class="completed-badge">&#10003; 完成</span>' : '<div class="project-type">' + done + '/' + total + ' 部件</div>';
+    html += '<div class="project-card' + (allDone ? ' completed' : '') + '" onclick="openProject(\'' + pj.id + '\')">';
+    html += '<div class="project-card-top"><div class="project-name">' + escH(pj.name) + '</div>' + badge + '</div>';
+    html += '<div class="project-meta">' + total + ' 個細項</div>';
+    html += '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div>';
+    html += '<div class="progress-row"><span class="progress-pct">' + pct + '%</span><span class="progress-detail">整體進度</span></div>';
+    html += '</div>';
   }
-
   el.innerHTML = html;
 }
 
-function renderProjectCard(p) {
-  var pct = p.total > 0 ? Math.min(100, Math.round((p.row / p.total) * 100)) : 0;
-  var unit = p.type === 'round' ? '圈' : '行';
-  var ac = p.id === currentProjectId ? ' active-project' : '';
-  var completedClass = p.completed ? ' completed' : '';
-  var badge = p.completed ? '<span class="completed-badge">✓ 完成</span>' : '<div class="project-type">' + (p.type === 'round' ? '圓織' : '平織') + '</div>';
-  var chartBadge = (p.chart && p.chart.imageData) ? ' <span style="font-size:11px;color:var(--teal)">🗺</span>' : '';
-  var html = '<div class="project-card' + ac + completedClass + '" onclick="openProject(\'' + p.id + '\')">';
-  html += '<div class="project-card-top"><div class="project-name">' + escH(p.name) + chartBadge + '</div>';
-  html += badge + '</div>';
-  html += '<div class="project-meta">第 ' + p.row + ' ' + unit + '　共 ' + p.total + ' ' + unit + '</div>';
+function renderSubs() {
+  var pj = getProj(); if (!pj) return;
+  var el = document.getElementById('subList');
+  var active = pj.subs.filter(function(s){return !s.completed;});
+  var done = pj.subs.filter(function(s){return s.completed;});
+  if (pj.subs.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="emoji">&#x1F9F5;</div><p>還沒有細項<br>點下方「新增細項」！</p></div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < active.length; i++) html += subCard(active[i]);
+  if (done.length > 0) {
+    html += '<div class="section-label" style="margin-top:20px">已完成</div>';
+    for (var j = 0; j < done.length; j++) html += subCard(done[j]);
+  }
+  el.innerHTML = html;
+}
+
+function subCard(s) {
+  var pct = s.total > 0 ? Math.min(100, Math.round((s.row / s.total) * 100)) : 0;
+  var unit = s.type === 'round' ? '圈' : '行';
+  var badge = s.completed ? '<span class="completed-badge">&#10003; 完成</span>' : '<div class="project-type">' + (s.type === 'round' ? '圓織' : '平織') + '</div>';
+  var chartBadge = (s.charts && s.charts.length > 0) ? ' <span style="font-size:11px;color:var(--teal)">&#x1F5FA;' + (s.charts.length>1?'×'+s.charts.length:'') + '</span>' : '';
+  var html = '<div class="project-card' + (s.completed?' completed':'') + '" onclick="openSub(\'' + s.id + '\')">';
+  html += '<div class="project-card-top"><div class="project-name">' + escH(s.name) + chartBadge + '</div>' + badge + '</div>';
+  html += '<div class="project-meta">第 ' + s.row + ' ' + unit + '　共 ' + s.total + ' ' + unit + '</div>';
   html += '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div>';
-  html += '<div class="progress-row"><span class="progress-pct">' + pct + '%</span><span class="progress-detail">整體進度</span></div>';
+  html += '<div class="progress-row"><span class="progress-pct">' + pct + '%</span><span class="progress-detail">進度</span></div>';
   html += '</div>';
   return html;
 }
 
 function updateTabVisibility() {
-  var inProject = !!currentProjectId;
-  document.getElementById('tabList').style.display = inProject ? 'none' : 'flex';
-  document.getElementById('tabCounter').style.display = inProject ? 'flex' : 'none';
-  document.getElementById('tabChart').style.display = inProject ? 'flex' : 'none';
-  document.getElementById('tabNotes').style.display = inProject ? 'flex' : 'none';
+  var inSub = !!currentSubId;
+  document.getElementById('tabList').style.display = inSub ? 'none' : 'flex';
+  document.getElementById('tabCounter').style.display = inSub ? 'flex' : 'none';
+  document.getElementById('tabChart').style.display = inSub ? 'flex' : 'none';
+  document.getElementById('tabNotes').style.display = inSub ? 'flex' : 'none';
 }
 
 function openProject(id) {
   window.scrollTo(0,0);
   currentProjectId = id;
+  currentSubId = null;
+  updateTabVisibility();
+  switchTab('subs');
+}
+
+function openSub(id) {
+  window.scrollTo(0,0);
+  currentSubId = id;
   pendingDelete = false;
+  chartImg = null; // force chart reload for this sub
   updateTabVisibility();
   switchTab('counter');
 }
+
+function goSubs() {
+  currentSubId = null;
+  chartImg = null;
+  updateTabVisibility();
+  switchTab('subs');
+}
+
 function goHome() {
   currentProjectId = null;
+  currentSubId = null;
+  chartImg = null;
   document.getElementById('headerTitle').textContent = '🧶 我的作品';
   document.getElementById('headerSub').style.display = 'none';
   document.getElementById('headerBack').style.display = 'none';
   updateTabVisibility();
   switchTab('list');
+}
+
+function headerBackAction() {
+  if (currentSubId) goSubs();
+  else goHome();
 }
 
 var palette = ['clay','teal','brown'];
@@ -449,7 +559,8 @@ function renderCounter() {
   document.getElementById('cBar').style.width = pct + '%';
   document.getElementById('cDetail').textContent = '第 ' + p.row + ' ' + unit + '，共 ' + p.total + ' ' + unit;
   document.getElementById('headerTitle').textContent = p.name;
-  document.getElementById('headerSub').textContent = p.type === 'round' ? '圓織' : '平織';
+  var pjh = getProj();
+  document.getElementById('headerSub').textContent = (pjh ? pjh.name + ' · ' : '') + (p.type === 'round' ? '圓織' : '平織');
   document.getElementById('headerSub').style.display = 'block';
   document.getElementById('headerBack').style.display = 'block';
 
@@ -536,7 +647,21 @@ function applyJump() {
   if (currentTab === 'chart') drawChart();
 }
 
-function openAddModal() {
+function openAddProjectModal() {
+  document.getElementById('newProjName').value = '';
+  document.getElementById('addProjectModal').classList.add('open');
+  setTimeout(function() { document.getElementById('newProjName').focus(); }, 80);
+}
+function closeAddProjectModal() { document.getElementById('addProjectModal').classList.remove('open'); }
+function saveNewProjectV3() {
+  var name = document.getElementById('newProjName').value.trim();
+  if (!name) { showToast('請輸入作品名稱'); return; }
+  var pj = { id: genId(), name: name, subs: [] };
+  projects.push(pj);
+  save(); closeAddProjectModal(); renderList(); showToast('已新增：' + name);
+}
+
+function openAddSubModal() {
   newProjectType = 'flat'; newCustomCounters = []; modStitchOn = false; modRepeatOn = false;
   document.getElementById('newName').value = '';
   document.getElementById('newTotal').value = '';
@@ -583,32 +708,42 @@ function renderCustomCounterList() {
   document.getElementById('customCounterList').innerHTML = html;
 }
 function saveNewProject() {
+  var pj = getProj(); if (!pj) { showToast('請先選擇作品'); return; }
   var name = document.getElementById('newName').value.trim();
   var total = parseInt(document.getElementById('newTotal').value) || 0;
-  if (!name) { showToast('請輸入作品名稱'); return; }
+  if (!name) { showToast('請輸入細項名稱'); return; }
   if (total < 1) { showToast('請輸入總行數/圈數'); return; }
   var customs = [];
   for (var i = 0; i < newCustomCounters.length; i++) {
     var n = newCustomCounters[i].name.trim();
     if (n) customs.push({name:n, value:0});
   }
-  var p = { id:genId(), name:name, type:newProjectType, total:total, row:1, stitch:0, repeat:0, notes:'',
+  var s = { id:genId(), name:name, type:newProjectType, total:total, row:1, stitch:0, repeat:0, notes:'',
     modules:{ stitch:modStitchOn, repeat:modRepeatOn, custom:customs },
-    chart:{ imageData:null, rowY1:null, rowY2:null, stitchX1:null, stitchX2:null } };
-  projects.push(p);
-  save(); closeAddModal(); renderList(); showToast('已新增：' + name);
+    charts: [], activeChart: 0, completed: false };
+  pj.subs.push(s);
+  save(); closeAddModal(); renderSubs(); renderList(); showToast('已新增：' + name);
 }
 
+var pendingDeleteProject = false;
 function confirmDelete() {
   if (!pendingDelete) { pendingDelete=true; showToast('再按一次確認刪除'); setTimeout(function(){pendingDelete=false;},3000); }
   else {
-    var p=getProject(); if(!p) return;
-    var name=p.name;
-    projects=projects.filter(function(x){return x.id!==currentProjectId;});
-    currentProjectId=null; save(); goHome(); showToast('已刪除：'+name);
+    var pj=getProj(); var s=getProject(); if(!pj||!s) return;
+    var name=s.name;
+    pj.subs=pj.subs.filter(function(x){return x.id!==currentSubId;});
+    currentSubId=null; save(); goSubs(); showToast('已刪除：'+name);
   }
 }
-
+function confirmDeleteProject() {
+  if (!pendingDeleteProject) { pendingDeleteProject=true; showToast('再按一次確認刪除整個作品'); setTimeout(function(){pendingDeleteProject=false;},3000); }
+  else {
+    var pj=getProj(); if(!pj) return;
+    var name=pj.name;
+    projects=projects.filter(function(x){return x.id!==currentProjectId;});
+    currentProjectId=null; currentSubId=null; save(); goHome(); showToast('已刪除：'+name);
+  }
+}
 function saveNotes() {
   var p=getProject(); if(!p) return;
   p.notes=document.getElementById('notesArea').value;
@@ -748,15 +883,16 @@ var dragStartY = null;
 var dragOrigY = null;
 
 function chartNewData() {
-  return { imageData: null, anchors: [], rowOverrides: {}, stitchX1: null, stitchX2: null };
+  return { imageData: null, anchors: [], rowOverrides: {}, stitchX1: null, stitchX2: null, done: false };
 }
 
 function getRowY(p, rowNum) {
-  // Check manual override first
-  if (p.chart.rowOverrides && p.chart.rowOverrides[rowNum] !== undefined) {
-    return p.chart.rowOverrides[rowNum];
+  var ch = getActiveChart(p);
+  if (!ch) return null;
+  if (ch.rowOverrides && ch.rowOverrides[rowNum] !== undefined) {
+    return ch.rowOverrides[rowNum];
   }
-  var anchors = p.chart.anchors || [];
+  var anchors = ch.anchors || [];
   if (anchors.length === 0) return null;
   if (anchors.length === 1) return anchors[0].y + (rowNum - anchors[0].row) * 20;
   // Sort anchors by row
@@ -786,49 +922,64 @@ function getRowY(p, rowNum) {
 function renderChart() {
   var p = getProject();
   var el = document.getElementById('chartContent');
-  if (!p) { el.innerHTML = '<div class="chart-empty"><p>請先選擇作品</p></div>'; return; }
-  if (!p.chart) p.chart = chartNewData();
-  if (!p.chart.anchors) p.chart.anchors = [];
-  if (!p.chart.rowOverrides) p.chart.rowOverrides = {};
+  if (!p) { el.innerHTML = '<div class="chart-empty"><p>請先選擇細項</p></div>'; return; }
+  if (!p.charts) p.charts = [];
 
-  // If canvas already exists and image is loaded, just redraw
+  var ch = getActiveChart(p);
+  var hasImg = !!(ch && ch.imageData);
+  var hasAnchors = hasImg && ch.anchors.length >= 2;
+  var unit = p.type === 'round' ? '圈' : '行';
+
+  // If canvas exists and image loaded for the SAME chart, just redraw
   var existingCanvas = document.getElementById('chartCanvas');
-  if (existingCanvas && chartImg && chartImg.complete && chartImg.naturalWidth > 0) {
+  if (existingCanvas && hasImg && chartImg && chartImg.complete && chartImg.naturalWidth > 0 && chartImgSrcId === p.activeChart + '_' + currentSubId) {
     drawChart();
     updateChartAnchorList(p);
     updateChartStatusBar(p);
     return;
   }
 
-  var hasImg = !!p.chart.imageData;
-  var hasAnchors = p.chart.anchors.length >= 2;
-  var unit = p.type === 'round' ? '圈' : '行';
-
   var html = '<div class="chart-toolbar">';
-  html += '<button class="chart-tool-btn" onclick="document.getElementById(\'chartFileInput\').click()">📷 上傳 / 拍照</button>';
+  html += '<button class="chart-tool-btn" onclick="document.getElementById(\'chartFileInput\').click()">&#x1F4F7; ' + (hasImg ? '加新圖' : '上傳 / 拍照') + '</button>';
   if (hasImg) html += '<button class="chart-tool-btn" id="btnAddAnchor" onclick="startAddAnchor()">&#x1F4CC; 加錨點</button>';
   if (hasImg && hasAnchors) html += '<button class="chart-tool-btn" id="btnDrag" onclick="startDragMode()">&#x2195;&#xFE0F; 微調行</button>';
   if (hasImg && hasAnchors) html += '<button class="chart-tool-btn" onclick="startStitchCalib()">&#x1F9F5; 針數校準</button>';
+  if (hasImg) html += '<button class="chart-tool-btn" onclick="toggleChartDone()">' + (ch.done ? '&#8617; 未完成' : '&#10003; 完成此圖') + '</button>';
   if (hasImg) html += '<button class="chart-tool-btn" onclick="clearChartData()">&#x1F5D1;</button>';
   html += '</div>';
+
+  // thumbnail strip
+  if (p.charts.length > 0) {
+    html += '<div style="display:flex;gap:8px;padding:8px 16px 0;overflow-x:auto">';
+    for (var t = 0; t < p.charts.length; t++) {
+      var thumb = p.charts[t];
+      var isActive = t === p.activeChart;
+      var doneMark = thumb.done ? '<div style="position:absolute;top:2px;right:2px;width:16px;height:16px;background:var(--teal);border-radius:50%;color:white;font-size:10px;display:flex;align-items:center;justify-content:center">&#10003;</div>' : '';
+      html += '<div onclick="switchChart(' + t + ')" style="position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:2.5px solid ' + (isActive ? 'var(--clay)' : 'var(--cream)') + ';flex-shrink:0;cursor:pointer' + (thumb.done ? ';opacity:0.6' : '') + '">';
+      html += '<img src="' + thumb.imageData + '" style="width:100%;height:100%;object-fit:cover">';
+      html += doneMark;
+      html += '</div>';
+    }
+    html += '</div>';
+  }
 
   html += '<div class="chart-status-bar" id="chartStatusBar">';
   if (!hasImg) html += '上傳織圖，讓 App 追蹤你的進度';
   else if (!hasAnchors) html += '&#x1F4CC; 點「加錨點」，在圖上點出幾個行的位置';
-  else html += '第 ' + p.row + ' ' + unit + ' &nbsp;&#183;&nbsp; 第 ' + p.stitch + ' 針　｜ 錨點 ' + p.chart.anchors.length + ' 個';
+  else html += '第 ' + p.row + ' ' + unit + ' &nbsp;&#183;&nbsp; 第 ' + p.stitch + ' 針';
   html += '</div>';
 
   if (!hasImg) {
-    html += '<div class="chart-empty"><div class="emoji">&#x1F5FA;</div><p>上傳織圖圖片（或直接拍照）<br>支援多點校準＋手動微調</p><button class="chart-upload-btn" onclick="document.getElementById(\'chartFileInput\').click()">📷 上傳 / 拍照</button></div>';
+    html += '<div class="chart-empty"><div class="emoji">&#x1F5FA;</div><p>上傳織圖圖片（或直接拍照）<br>可存多張圖並個別標記完成</p><button class="chart-upload-btn" onclick="document.getElementById(\'chartFileInput\').click()">&#x1F4F7; 上傳 / 拍照</button></div>';
   } else {
     html += '<div class="chart-canvas-wrap"><canvas id="chartCanvas"></canvas></div>';
     html += '<div class="chart-info" id="chartInfo"></div>';
   }
 
   // anchor list
-  if (hasImg && p.chart.anchors.length > 0) {
-    html += '<div style="padding:0 16px 8px"><div class="section-label" style="margin-bottom:8px">已設錨點</div><div id="chartAnchorList">';
-    var sorted = p.chart.anchors.slice().sort(function(a,b){return a.row-b.row;});
+  if (hasImg && ch.anchors.length > 0) {
+    html += '<div style="padding:0 16px 8px"><div class="section-label" style="margin-bottom:8px">已設錨點</div>';
+    var sorted = ch.anchors.slice().sort(function(a,b){return a.row-b.row;});
     html += '<div id="chartAnchorList">';
     for (var i=0;i<sorted.length;i++) {
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;color:var(--brown-light)">';
@@ -844,16 +995,43 @@ function renderChart() {
   chartMode = 'view';
 
   if (hasImg) {
-    if (chartImg && chartImg.complete && chartImg.naturalWidth > 0 && chartImg.src.length > 100) {
-      // already loaded, draw immediately
-      drawChart();
-      setTimeout(function() { setupChartEvents(); }, 50);
-    } else {
-      chartImg = new Image();
-      chartImg.onload = function() { drawChart(); setupChartEvents(); };
-      chartImg.src = p.chart.imageData;
-    }
+    chartImg = new Image();
+    chartImgSrcId = p.activeChart + '_' + currentSubId;
+    chartImg.onload = function() { drawChart(); setupChartEvents(); };
+    chartImg.src = ch.imageData;
   }
+}
+
+var chartImgSrcId = null;
+
+function switchChart(idx) {
+  var p = getProject(); if (!p) return;
+  p.activeChart = idx;
+  chartImg = null;
+  chartImgSrcId = null;
+  save();
+  renderChart();
+}
+
+function toggleChartDone() {
+  var p = getProject(); if (!p) return;
+  var ch = getActiveChart(p); if (!ch) return;
+  ch.done = !ch.done;
+  if (ch.done) {
+    // move to end of list
+    var idx = p.activeChart;
+    var moved = p.charts.splice(idx, 1)[0];
+    p.charts.push(moved);
+    p.activeChart = Math.min(idx, p.charts.length - 1);
+    // switch to first not-done chart if exists
+    for (var i = 0; i < p.charts.length; i++) {
+      if (!p.charts[i].done) { p.activeChart = i; break; }
+    }
+    chartImg = null; chartImgSrcId = null;
+  }
+  save();
+  renderChart();
+  showToast(ch.done ? '✓ 此圖已標記完成' : '↩ 已恢復');
 }
 
 function setupChartEvents() {
@@ -900,19 +1078,20 @@ function onChartPointer(x, y, dispW, dispH) {
 
   if (chartMode === 'addAnchor') {
     var p2 = getProject(); if (!p2) return;
+    var ch2 = getActiveChart(p2); if (!ch2) return;
     var rowNum = anchorCurrentRow;
-    p2.chart.anchors = p2.chart.anchors.filter(function(a) { return a.row !== rowNum; });
-    p2.chart.anchors.push({ row: rowNum, y: rawY });
+    ch2.anchors = ch2.anchors.filter(function(a) { return a.row !== rowNum; });
+    ch2.anchors.push({ row: rowNum, y: rawY });
     save(); renderChart();
     showToast('已加第 ' + rowNum + ' ' + (p2.type==='round'?'圈':'行') + ' 錨點');
     chartMode = 'addAnchor'; // stay in addAnchor mode for more points
   } else if (chartMode === 'stitchCalib1') {
-    p.chart.stitchX1 = rawX;
+    var chS1 = getActiveChart(p); if (chS1) chS1.stitchX1 = rawX;
     chartMode = 'stitchCalib2';
     setStatusBar('&#x1F446; 再點第 2 針的位置');
     drawChart();
   } else if (chartMode === 'stitchCalib2') {
-    p.chart.stitchX2 = rawX;
+    var chS2 = getActiveChart(p); if (chS2) chS2.stitchX2 = rawX;
     chartMode = 'view';
     save(); drawChart();
     setStatusBar('針數校準完成！');
@@ -939,7 +1118,8 @@ function startDragAt(x, y, dispW, dispH) {
 function moveDragAt(y, dispH) {
   var p = getProject(); if (!p || !chartImg || dragRowNum === null) return;
   var rawY = y * (chartImg.naturalHeight / dispH);
-  p.chart.rowOverrides[dragRowNum] = rawY;
+  var chD = getActiveChart(p); if (!chD) return;
+  chD.rowOverrides[dragRowNum] = rawY;
   drawChart();
 }
 function endDrag() {
@@ -964,10 +1144,11 @@ function drawChart() {
   ctx.drawImage(chartImg, 0, 0, dw, chartImg.naturalHeight * imgScale);
 
   var unit = p.type === 'round' ? '圈' : '行';
-  var hasAnchors = p.chart.anchors && p.chart.anchors.length >= 2;
-  if (!hasAnchors && p.chart.anchors && p.chart.anchors.length === 1) {
+  var ach = getActiveChart(p);
+  var hasAnchors = ach && ach.anchors && ach.anchors.length >= 2;
+  if (!hasAnchors && ach && ach.anchors && ach.anchors.length === 1) {
     // draw single anchor dot
-    var ay = p.chart.anchors[0].y * imgScale;
+    var ay = ach.anchors[0].y * imgScale;
     ctx.fillStyle = '#C4674A';
     ctx.beginPath(); ctx.arc(20, ay, 7, 0, Math.PI*2); ctx.fill();
     return;
@@ -975,7 +1156,7 @@ function drawChart() {
   if (!hasAnchors) return;
 
   // draw all anchor markers (subtle)
-  var anchors = p.chart.anchors;
+  var anchors = ach.anchors;
   for (var i=0;i<anchors.length;i++) {
     var ay2 = getRowY(p, anchors[i].row) * imgScale;
     ctx.strokeStyle = 'rgba(122,173,168,0.6)';
@@ -1053,7 +1234,8 @@ function drawChart() {
   }
 
   // stitch line — show if calibrated
-  var ch = p.chart;
+  var ch = getActiveChart(p);
+  if (!ch) return;
   if (ch.stitchX1 !== null && ch.stitchX2 !== null) {
     var stitchSpacing = (ch.stitchX2 - ch.stitchX1) * imgScale;
     var baseX = ch.stitchX1 * imgScale;
@@ -1094,8 +1276,9 @@ function updateChartStatusBar(p) {
 function updateChartAnchorList(p) {
   var el = document.getElementById('chartAnchorList');
   if (!el) return;
+  var ch = getActiveChart(p); if (!ch) return;
   var unit = p.type === 'round' ? '圈' : '行';
-  var sorted = p.chart.anchors.slice().sort(function(a,b){return a.row-b.row;});
+  var sorted = ch.anchors.slice().sort(function(a,b){return a.row-b.row;});
   var html = '';
   for (var i=0;i<sorted.length;i++) {
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;color:var(--brown-light)">';
@@ -1145,8 +1328,10 @@ function startStitchCalib() {
 }
 function removeAnchor(rowNum) {
   var p = getProject(); if (!p) return;
-  p.chart.anchors = p.chart.anchors.filter(function(a){return a.row!==rowNum;});
-  if (p.chart.rowOverrides) delete p.chart.rowOverrides[rowNum];
+  var ch = getActiveChart(p); if (!ch) return;
+  ch.anchors = ch.anchors.filter(function(a){return a.row!==rowNum;});
+  if (ch.rowOverrides) delete ch.rowOverrides[rowNum];
+  chartImgSrcId = null;
   save(); renderChart();
 }
 function setStatusBar(html) { var sb=document.getElementById('chartStatusBar'); if(sb) sb.innerHTML=html; }
@@ -1158,12 +1343,31 @@ function onChartFileSelected(e) {
     var reader = new FileReader();
     reader.onerror = function() { showToast('讀取圖片失敗，請重試'); };
     reader.onload = function(ev) {
-      try {
-        p.chart = chartNewData();
-        p.chart.imageData = ev.target.result;
-        save(); renderChart();
-        setTimeout(function() { startAddAnchor(); }, 400);
-      } catch(err) { showToast('載入圖片失敗'); }
+      // compress image to max 1000px width
+      var img = new Image();
+      img.onload = function() {
+        try {
+          var maxW = 1000;
+          var scale = Math.min(1, maxW / img.naturalWidth);
+          var cw = Math.round(img.naturalWidth * scale);
+          var chh = Math.round(img.naturalHeight * scale);
+          var tmpCv = document.createElement('canvas');
+          tmpCv.width = cw; tmpCv.height = chh;
+          var tctx = tmpCv.getContext('2d');
+          tctx.drawImage(img, 0, 0, cw, chh);
+          var compressed = tmpCv.toDataURL('image/jpeg', 0.8);
+          var newChart = chartNewData();
+          newChart.imageData = compressed;
+          if (!p.charts) p.charts = [];
+          p.charts.push(newChart);
+          p.activeChart = p.charts.length - 1;
+          chartImg = null; chartImgSrcId = null;
+          save(); renderChart();
+          setTimeout(function() { startAddAnchor(); }, 400);
+        } catch(err) { showToast('壓縮圖片失敗'); }
+      };
+      img.onerror = function() { showToast('載入圖片失敗'); };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
     try { e.target.value = ''; } catch(err) {}
@@ -1171,14 +1375,17 @@ function onChartFileSelected(e) {
 }
 function clearChartData() {
   var p = getProject(); if (!p) return;
-  p.chart = chartNewData();
-  chartImg=null; chartMode='view'; save(); renderChart(); showToast('已清除織圖');
+  if (!p.charts || p.charts.length === 0) return;
+  p.charts.splice(p.activeChart, 1);
+  p.activeChart = Math.max(0, p.activeChart - 1);
+  chartImg = null; chartImgSrcId = null; chartMode = 'view';
+  save(); renderChart(); showToast('已刪除此織圖');
 }
 
 function switchTab(tab) {
   exitFocusMode();
   currentTab = tab;
-  var ts = ['list','counter','chart','notes'];
+  var ts = ['list','subs','counter','chart','notes'];
   for (var i=0;i<ts.length;i++) {
     var t=ts[i];
     var pg=document.getElementById('page'+t[0].toUpperCase()+t.slice(1));
@@ -1191,15 +1398,27 @@ function switchTab(tab) {
     document.getElementById('headerSub').style.display='none';
     document.getElementById('headerBack').style.display='none';
     currentProjectId = null;
+    currentSubId = null;
+    updateTabVisibility();
     renderList();
+  } else if (tab==='subs') {
+    var pj0 = getProj();
+    if (pj0) {
+      document.getElementById('headerTitle').textContent = pj0.name;
+      document.getElementById('headerSub').textContent = pj0.subs.length + ' 個細項';
+      document.getElementById('headerSub').style.display = 'block';
+      document.getElementById('headerBack').style.display = 'block';
+      renderSubs();
+    } else switchTab('list');
   } else if (tab==='counter') {
-    if(currentProjectId) renderCounter(); else switchTab('list');
+    if(currentSubId) renderCounter(); else switchTab('list');
   } else if (tab==='chart') {
-    if(currentProjectId) {
+    if(currentSubId) {
       chartCalibStep=0;
+      var p3 = getProject();
+      var expected = p3 ? (p3.activeChart + '_' + currentSubId) : null;
       var cv = document.getElementById('chartCanvas');
-      if (cv && chartImg && chartImg.complete && chartImg.naturalWidth > 0) {
-        // page just became visible, draw after browser paint
+      if (cv && chartImg && chartImg.complete && chartImg.naturalWidth > 0 && chartImgSrcId === expected) {
         requestAnimationFrame(function() {
           requestAnimationFrame(function() {
             drawChart();
@@ -1211,7 +1430,7 @@ function switchTab(tab) {
       }
     } else switchTab('list');
   } else if (tab==='notes') {
-    if(currentProjectId) { var p=getProject(); if(p) document.getElementById('notesArea').value=p.notes||''; }
+    if(currentSubId) { var p=getProject(); if(p) document.getElementById('notesArea').value=p.notes||''; }
     else switchTab('list');
   }
   window.scrollTo(0,0);
