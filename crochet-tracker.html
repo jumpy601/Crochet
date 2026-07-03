@@ -163,6 +163,37 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
 .focus-band-flash.flash-right { animation: flashAnim 0.25s ease-out forwards; }
 @keyframes flashAnim { 0% { opacity: 0.35; } 100% { opacity: 0; } }
 .focus-mode-btn { background: var(--cream); border: none; border-radius: 99px; color: var(--brown-light); font-size: 13px; font-weight: 500; padding: 8px 16px; cursor: pointer; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px; margin: 0 auto 4px; }
+
+/* ── 針法順序表 ── */
+.stitch-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:14px; }
+.stitch-btn { background:var(--bg); border:1.5px solid var(--cream); border-radius:12px; padding:8px 2px 6px; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; transition:all 0.12s; touch-action:manipulation; }
+.stitch-btn:active { transform:scale(0.94); background:#FDF6F3; }
+.stitch-symbol svg { width:30px; height:30px; stroke:var(--brown); fill:none; stroke-width:5; stroke-linecap:round; }
+.stitch-name { font-size:10px; font-weight:500; color:var(--brown); text-align:center; line-height:1.2; }
+.seq-card { background:var(--bg); border:1.5px solid var(--cream); border-radius:12px; padding:10px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+.seq-num { width:22px; height:22px; background:var(--clay); border-radius:50%; color:white; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.seq-sym svg { width:26px; height:26px; stroke:var(--brown); fill:none; stroke-width:5; stroke-linecap:round; }
+.seq-info { flex:1; min-width:0; }
+.seq-stitch-name { font-size:14px; font-weight:600; }
+.seq-rows { font-size:11px; color:var(--brown-light); margin-top:1px; }
+.range-btn { width:28px; height:28px; border-radius:50%; border:none; background:var(--cream); color:var(--brown); font-size:15px; cursor:pointer; touch-action:manipulation; flex-shrink:0; }
+.range-val { font-family:'DM Mono',monospace; font-size:14px; font-weight:500; min-width:22px; text-align:center; }
+.seq-del { background:none; border:none; color:var(--brown-light); font-size:17px; cursor:pointer; padding:2px 4px; flex-shrink:0; }
+.current-banner { background:linear-gradient(135deg, var(--clay), var(--clay-light)); border-radius:var(--radius); padding:16px; color:white; display:flex; align-items:center; gap:12px; margin-bottom:14px; box-shadow:var(--shadow); }
+.current-banner .cb-sym { width:42px; height:42px; background:rgba(255,255,255,0.22); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.current-banner .cb-sym svg { width:34px; height:34px; stroke:white; fill:none; stroke-width:5; stroke-linecap:round; }
+.current-banner .cb-lbl { font-size:11px; opacity:0.85; }
+.current-banner .cb-nm { font-size:17px; font-weight:600; margin-top:1px; }
+.current-banner .cb-next { margin-left:auto; text-align:right; font-size:10px; opacity:0.85; line-height:1.45; flex-shrink:0; }
+.setting-row { background:var(--card); border-radius:12px; padding:10px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+.setting-sym svg { width:28px; height:28px; stroke:var(--brown); fill:none; stroke-width:5; stroke-linecap:round; }
+.setting-name { flex:1; font-size:14px; font-weight:500; }
+.toggle { width:44px; height:25px; border-radius:99px; background:var(--progress-bg); position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; }
+.toggle.on { background:var(--teal); }
+.toggle::after { content:''; position:absolute; top:3px; left:3px; width:19px; height:19px; border-radius:50%; background:white; transition:left 0.2s; }
+.toggle.on::after { left:22px; }
+.stitch-setting-link { background:none; border:none; color:var(--brown-light); font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; padding:4px 8px; text-decoration:underline; touch-action:manipulation; }
+
 .notes-textarea { width: 100%; min-height: 200px; padding: 16px; border-radius: var(--radius); border: 1.5px solid var(--cream); background: var(--card); font-size: 15px; font-family: 'Inter', sans-serif; color: var(--brown); resize: none; outline: none; box-shadow: var(--shadow); line-height: 1.6; }
 .install-banner { background: var(--brown); color: var(--bg); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; border-radius: var(--radius); }
 .install-banner-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
@@ -312,6 +343,13 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
     <div class="field-label">自訂計數器</div>
     <div id="customCounterList"></div>
     <button class="add-custom-btn" onclick="addCustomCounter()">＋ 新增自訂計數器</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+      <div class="field-label" style="margin-bottom:0">針法順序（選填）</div>
+      <button class="stitch-setting-link" onclick="openStitchSettings()">&#9881; 設定常用針法</button>
+    </div>
+    <div style="font-size:11px;color:var(--brown-light);margin:4px 0 10px">點針法加入順序，用 −＋ 調行數範圍</div>
+    <div class="stitch-grid" id="stitchGrid"></div>
+    <div id="seqList"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeAddModal()">取消</button>
       <button class="btn-save" onclick="saveNewProject()">建立</button>
@@ -333,6 +371,17 @@ canvas#chartCanvas { display: block; width: 100%; touch-action: none; cursor: cr
 <input type="file" id="chartFileInput" accept="image/*" style="display:none">
 
 <!-- ANCHOR MODAL -->
+
+<div class="modal-overlay" id="stitchSettingsModal">
+  <div class="modal">
+    <div class="modal-title">常用針法設定</div>
+    <div style="font-size:12px;color:var(--brown-light);margin-bottom:12px">關掉的針法不會出現在選擇按鈕裡</div>
+    <div id="stitchSettingList"></div>
+    <div class="modal-actions">
+      <button class="btn-save" onclick="closeStitchSettings()" style="flex:1">完成</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -395,6 +444,7 @@ function load() {
       if (s.activeChart === undefined) s.activeChart = 0;
       if (s.stitch === undefined) s.stitch = 0;
       if (s.repeat === undefined) s.repeat = 0;
+      if (!s.stitchSeq) s.stitchSeq = [];
       // normalize charts
       for (var m = 0; m < s.charts.length; m++) {
         var chd = s.charts[m];
@@ -429,6 +479,142 @@ function getActiveChart(s) {
   return s.charts[s.activeChart];
 }
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+
+// ── 針法資料 ──
+var STITCHES = [
+  { id:'ch',  name:'鎖針',   svg:'<ellipse cx="50" cy="50" rx="32" ry="18"/>' },
+  { id:'sl',  name:'引拔針', svg:'<ellipse cx="50" cy="50" rx="30" ry="16" style="fill:currentColor"/>' },
+  { id:'sc',  name:'短針',   svg:'<line x1="28" y1="28" x2="72" y2="72"/><line x1="72" y1="28" x2="28" y2="72"/>' },
+  { id:'hdc', name:'中長針', svg:'<line x1="50" y1="20" x2="50" y2="82"/><line x1="26" y1="20" x2="74" y2="20"/>' },
+  { id:'dc',  name:'長針',   svg:'<line x1="50" y1="14" x2="50" y2="86"/><line x1="26" y1="14" x2="74" y2="14"/><line x1="34" y1="42" x2="66" y2="30"/>' },
+  { id:'tr',  name:'長長針', svg:'<line x1="50" y1="12" x2="50" y2="88"/><line x1="26" y1="12" x2="74" y2="12"/><line x1="34" y1="38" x2="66" y2="27"/><line x1="34" y1="56" x2="66" y2="45"/>' },
+  { id:'inc', name:'加針',   svg:'<line x1="50" y1="70" x2="28" y2="30"/><line x1="50" y1="70" x2="72" y2="30"/><line x1="20" y1="25" x2="36" y2="35"/><line x1="36" y1="25" x2="20" y2="35"/><line x1="64" y1="25" x2="80" y2="35"/><line x1="80" y1="25" x2="64" y2="35"/>' },
+  { id:'dec', name:'併針',   svg:'<line x1="50" y1="26" x2="28" y2="72"/><line x1="50" y1="26" x2="72" y2="72"/><line x1="30" y1="46" x2="46" y2="56"/><line x1="46" y1="46" x2="30" y2="56"/><line x1="54" y1="46" x2="70" y2="56"/><line x1="70" y1="46" x2="54" y2="56"/>' },
+  { id:'shell', name:'松葉針', svg:'<line x1="50" y1="80" x2="20" y2="25"/><line x1="50" y1="80" x2="35" y2="20"/><line x1="50" y1="80" x2="50" y2="18"/><line x1="50" y1="80" x2="65" y2="20"/><line x1="50" y1="80" x2="80" y2="25"/>' },
+  { id:'puff', name:'泡泡針', svg:'<ellipse cx="50" cy="50" rx="22" ry="32"/><line x1="50" y1="18" x2="50" y2="82"/><line x1="38" y1="22" x2="38" y2="78"/><line x1="62" y1="22" x2="62" y2="78"/>' },
+  { id:'picot', name:'結粒針', svg:'<circle cx="50" cy="38" r="18"/><line x1="38" y1="62" x2="46" y2="72"/><line x1="62" y1="62" x2="54" y2="72"/>' },
+  { id:'fpdc', name:'表引長針', svg:'<line x1="50" y1="14" x2="50" y2="86"/><line x1="26" y1="14" x2="74" y2="14"/><line x1="34" y1="42" x2="66" y2="30"/><path d="M 38 70 Q 30 78 38 86"/>' }
+];
+var DEFAULT_ENABLED = { ch:true, sl:true, sc:true, hdc:true, dc:true, tr:false, inc:true, dec:true, shell:false, puff:false, picot:false, fpdc:false };
+var enabledStitches = {};
+
+function loadStitchPrefs() {
+  var raw = localStorage.getItem('crochet_stitch_prefs');
+  if (raw) { try { enabledStitches = JSON.parse(raw); } catch(e) { enabledStitches = {}; } }
+  for (var i=0;i<STITCHES.length;i++) {
+    if (enabledStitches[STITCHES[i].id] === undefined) enabledStitches[STITCHES[i].id] = DEFAULT_ENABLED[STITCHES[i].id] || false;
+  }
+}
+function saveStitchPrefs() { localStorage.setItem('crochet_stitch_prefs', JSON.stringify(enabledStitches)); }
+
+function stitchSym(id) {
+  for (var i=0;i<STITCHES.length;i++) if (STITCHES[i].id===id) return '<svg viewBox="0 0 100 100">' + STITCHES[i].svg + '</svg>';
+  return '';
+}
+function stitchName(id) {
+  for (var i=0;i<STITCHES.length;i++) if (STITCHES[i].id===id) return STITCHES[i].name;
+  return id;
+}
+
+// 新增細項時的順序表暫存
+var newStitchSeq = [];
+
+function renderStitchGrid() {
+  var el = document.getElementById('stitchGrid'); if (!el) return;
+  var html = '';
+  for (var i=0;i<STITCHES.length;i++) {
+    var s = STITCHES[i];
+    if (!enabledStitches[s.id]) continue;
+    html += '<div class="stitch-btn" onclick="addStitchSeq(\'' + s.id + '\')">';
+    html += '<div class="stitch-symbol">' + stitchSym(s.id) + '</div>';
+    html += '<div class="stitch-name">' + s.name + '</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html || '<div style="grid-column:1/-1;font-size:12px;color:var(--brown-light);text-align:center;padding:8px">請先到「設定常用針法」開啟針法</div>';
+}
+
+function renderSeqList() {
+  var el = document.getElementById('seqList'); if (!el) return;
+  var html = '';
+  for (var i=0;i<newStitchSeq.length;i++) {
+    var q = newStitchSeq[i];
+    html += '<div class="seq-card">';
+    html += '<div class="seq-num">' + (i+1) + '</div>';
+    html += '<div class="seq-sym">' + stitchSym(q.stitch) + '</div>';
+    html += '<div class="seq-info"><div class="seq-stitch-name">' + stitchName(q.stitch) + '</div>';
+    html += '<div class="seq-rows">第 ' + q.from + ' – ' + q.to + ' 行</div></div>';
+    html += '<button class="range-btn" onclick="adjSeq(' + i + ',-1)">−</button>';
+    html += '<span class="range-val">' + q.to + '</span>';
+    html += '<button class="range-btn" onclick="adjSeq(' + i + ',1)">＋</button>';
+    html += '<button class="seq-del" onclick="delSeq(' + i + ')">&#215;</button>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function recalcSeqRanges() {
+  var start = 1;
+  for (var i=0;i<newStitchSeq.length;i++) {
+    var len = newStitchSeq[i].to - newStitchSeq[i].from;
+    newStitchSeq[i].from = start;
+    newStitchSeq[i].to = start + len;
+    start = newStitchSeq[i].to + 1;
+  }
+}
+function addStitchSeq(id) {
+  var last = newStitchSeq.length ? newStitchSeq[newStitchSeq.length-1].to : 0;
+  newStitchSeq.push({ stitch:id, from:last+1, to:last+2 });
+  renderSeqList();
+}
+function adjSeq(i, d) {
+  var q = newStitchSeq[i];
+  if (q.to + d < q.from) return;
+  q.to += d;
+  recalcSeqRanges();
+  renderSeqList();
+}
+function delSeq(i) {
+  newStitchSeq.splice(i,1);
+  recalcSeqRanges();
+  renderSeqList();
+}
+
+// 針法設定 modal
+function openStitchSettings() {
+  var el = document.getElementById('stitchSettingList');
+  var html = '';
+  for (var i=0;i<STITCHES.length;i++) {
+    var s = STITCHES[i];
+    html += '<div class="setting-row">';
+    html += '<div class="setting-sym">' + stitchSym(s.id) + '</div>';
+    html += '<div class="setting-name">' + s.name + '</div>';
+    html += '<div class="toggle' + (enabledStitches[s.id]?' on':'') + '" onclick="toggleStitchPref(\'' + s.id + '\',this)"></div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+  document.getElementById('stitchSettingsModal').classList.add('open');
+}
+function closeStitchSettings() {
+  document.getElementById('stitchSettingsModal').classList.remove('open');
+  renderStitchGrid();
+}
+function toggleStitchPref(id, el) {
+  enabledStitches[id] = !enabledStitches[id];
+  el.classList.toggle('on', enabledStitches[id]);
+  saveStitchPrefs();
+}
+
+// 根據行數找目前針法區段
+function getStitchSegment(s, row) {
+  if (!s.stitchSeq || s.stitchSeq.length === 0) return null;
+  for (var i=0;i<s.stitchSeq.length;i++) {
+    if (row >= s.stitchSeq[i].from && row <= s.stitchSeq[i].to) {
+      return { seg: s.stitchSeq[i], idx: i, next: s.stitchSeq[i+1] || null };
+    }
+  }
+  return null;
+}
 
 function toggleComplete() {
   var p = getProject(); if (!p) return;
@@ -564,7 +750,22 @@ function renderCounter() {
   document.getElementById('headerSub').style.display = 'block';
   document.getElementById('headerBack').style.display = 'block';
 
-  var html = buildSection(
+  var html = '';
+  var segInfo = getStitchSegment(p, p.row);
+  if (segInfo) {
+    var unit2 = p.type === 'round' ? '圈' : '行';
+    html += '<div class="current-banner">';
+    html += '<div class="cb-sym">' + stitchSym(segInfo.seg.stitch) + '</div>';
+    html += '<div><div class="cb-lbl">目前針法 · 第 ' + p.row + ' ' + unit2 + '</div>';
+    html += '<div class="cb-nm">' + stitchName(segInfo.seg.stitch) + '</div></div>';
+    if (segInfo.next) {
+      html += '<div class="cb-next">下一段<br>第 ' + segInfo.next.from + ' ' + unit2 + ' 起<br>' + stitchName(segInfo.next.stitch) + '</div>';
+    }
+    html += '</div>';
+  } else if (p.stitchSeq && p.stitchSeq.length > 0) {
+    html += '<div class="current-banner" style="background:var(--cream);color:var(--brown-light)"><div style="font-size:13px">已超出針法順序表範圍</div></div>';
+  }
+  html += buildSection(
     (p.type === 'round' ? '&#x1F504; 圈數' : '&#x1F9F5; 行 / 段'),
     p.row, '點擊直接設定', 'clay', 'adjustRow(-1)', 'adjustRow(1)', 'openJump("row")', ''
   );
@@ -606,7 +807,17 @@ function buildSection(label, value, sub, color, mFn, pFn, jFn, rFn) {
   return h;
 }
 
-function adjustRow(d) { var p=getProject(); if(!p) return; p.row=Math.max(1,p.row+d); save(); renderCounter(); renderList(); if(currentTab==='chart') { drawChart(); updateChartStatusBar(p); } }
+function adjustRow(d) {
+  var p=getProject(); if(!p) return;
+  var oldSeg = getStitchSegment(p, p.row);
+  p.row=Math.max(1,p.row+d);
+  var newSeg = getStitchSegment(p, p.row);
+  if (newSeg && (!oldSeg || oldSeg.idx !== newSeg.idx) && d > 0) {
+    showToast('換「' + stitchName(newSeg.seg.stitch) + '」囉！');
+  }
+  save(); renderCounter(); renderList();
+  if(currentTab==='chart') { drawChart(); updateChartStatusBar(p); }
+}
 function adjustStitch(d) { var p=getProject(); if(!p) return; p.stitch=Math.max(0,p.stitch+d); save(); renderCounter(); if(currentTab==='chart') { drawChart(); updateChartStatusBar(p); } }
 function resetStitch() { var p=getProject(); if(!p) return; p.stitch=0; save(); renderCounter(); showToast('針數已重置'); if(currentTab==='chart') drawChart(); }
 function adjustRepeat(d) { var p=getProject(); if(!p) return; p.repeat=Math.max(0,p.repeat+d); save(); renderCounter(); }
@@ -674,6 +885,9 @@ function openAddSubModal() {
   document.getElementById('modStitchCheck').classList.remove('checked');
   document.getElementById('modRepeatCheck').classList.remove('checked');
   renderCustomCounterList();
+  newStitchSeq = [];
+  renderStitchGrid();
+  renderSeqList();
   document.getElementById('addModal').classList.add('open');
   setTimeout(function() { document.getElementById('newName').focus(); }, 80);
 }
@@ -720,6 +934,7 @@ function saveNewProject() {
   }
   var s = { id:genId(), name:name, type:newProjectType, total:total, row:1, stitch:0, repeat:0, notes:'',
     modules:{ stitch:modStitchOn, repeat:modRepeatOn, custom:customs },
+    stitchSeq: newStitchSeq.slice(),
     charts: [], activeChart: 0, completed: false };
   pj.subs.push(s);
   save(); closeAddModal(); renderSubs(); renderList(); showToast('已新增：' + name);
@@ -788,8 +1003,14 @@ function getFocusCounters(p) {
 
 function adjustFocusKey(key, d) {
   var p = getProject(); if (!p) return;
-  if (key === 'row') p.row = Math.max(1, p.row + d);
-  else if (key === 'stitch') p.stitch = Math.max(0, p.stitch + d);
+  if (key === 'row') {
+    var oldSeg = getStitchSegment(p, p.row);
+    p.row = Math.max(1, p.row + d);
+    var newSeg = getStitchSegment(p, p.row);
+    if (newSeg && (!oldSeg || oldSeg.idx !== newSeg.idx) && d > 0) {
+      showToast('換「' + stitchName(newSeg.seg.stitch) + '」囉！');
+    }
+  } else if (key === 'stitch') p.stitch = Math.max(0, p.stitch + d);
   else if (key === 'repeat') p.repeat = Math.max(0, p.repeat + d);
   else if (key.indexOf('custom_') === 0) { var idx=parseInt(key.replace('custom_','')); p.modules.custom[idx].value=Math.max(0,p.modules.custom[idx].value+d); }
   save();
@@ -1457,6 +1678,7 @@ document.getElementById('chartFileInput').addEventListener('change', function(e)
 
 
 load();
+loadStitchPrefs();
 loadTheme();
 renderList();
 checkInstallBanner();
